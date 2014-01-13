@@ -1,0 +1,22 @@
+{
+    "servers": [
+        {
+	    "name": "elliptics-client",
+	    "image_name": "elliptics",
+	    "key_name": "",
+	    "flavor_name": "m1.small",
+	    "max_count": 1,
+	    "min_count": 1,
+	    "networks_label_list": ["SEARCHSAND"]
+	},
+	{
+	    "name": "elliptics-node",
+	    "image_name": "elliptics",
+	    "key_name": "",
+	    "flavor_name": "m1.small",
+	    "max_count": 3,
+	    "min_count": 3,
+	    "networks_label_list": ["SEARCHSAND"]
+	}
+    ]
+}
