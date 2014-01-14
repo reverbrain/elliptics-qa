@@ -2,4 +2,4 @@
 - include: elliptics-setup.yml
 - hosts: elliptics-client
   roles:
-    - elliptics-big-rwtest
+    - big-rwtest
