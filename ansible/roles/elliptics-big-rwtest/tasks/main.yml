@@ -2,7 +2,7 @@
 - name: Copy tests
   copy: src={{ item }} dest=/root
   with_fileglob:
-    - ../../../../tests/big-rwtest/*
+    - "{{ lookup('env', 'TESTS_DIR') }}/*"
 
 - name: Run test
   shell: py.test test_elliptics.py --tx={{ tx_number }}*popen --dist=each --batch_size={{ batch_size }} --batch_number={{ batch_number}} --write_timeout={{ wait_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups['elliptics'] %} --host={{ host }} {% endfor %}
