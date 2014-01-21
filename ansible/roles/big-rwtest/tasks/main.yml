@@ -1,8 +1,8 @@
 ---
-- name: Copy tests
-  copy: src={{ item }} dest=/root
-  with_fileglob:
-    - "{{ lookup('env', 'TESTS_DIR') }}/*"
+- name: Getting tests from repository
+  git: repo=git://github.com/kis8ya/elliptics-qa.git
+       version=features/new-tests
+       dest=/root/elliptics-qa
 
 - name: Run test
-  shell: py.test test_elliptics.py --tx={{ tx_number }}*popen --dist=each --batch_size={{ batch_size }} --batch_number={{ batch_number}} --write_timeout={{ wait_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups['elliptics'] %} --host={{ host }} {% endfor %}
+  shell: py.test /root/elliptics-qa/tests/big-rwtest/test_elliptics.py --tx={{ tx_number }}*popen --dist=each --batch_size={{ batch_size }} --batch_number={{ batch_number}} --write_timeout={{ wait_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups['elliptics'] %} --host={{ host }} {% endfor %}
