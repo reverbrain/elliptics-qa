@@ -1,0 +1,8 @@
+---
+- name: Getting tests from repository
+  git: repo=git://github.com/kis8ya/elliptics-qa.git
+       version=features/new-tests
+       dest=/root/elliptics-qa
+
+- name: Run test
+  shell: 'py.test -v -rxs -m ''{{ testgroup }}'' --write_timeout={{ wait_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups["elliptics"] %} --host={{ host }} {% endfor %} /root/elliptics-qa/tests/functional-tests/'

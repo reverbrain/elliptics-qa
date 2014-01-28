@@ -1,0 +1,4 @@
+---
+testgroup: readtest or offsettest or pwctest
+wait_timeout: 10
+write_timeout: 60
