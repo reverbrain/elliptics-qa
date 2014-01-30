@@ -18,9 +18,10 @@ config = pytest.config
 
 class EllipticsTest(et.EllipticsTest):
     class Node(object):
-        def __init__(self, host, port):
+        def __init__(self, host, port, group):
             self.host = host
-            self.port = port
+            self.port = int(port)
+            self.group = int(group)
 
     DROP_RULE = "INPUT --proto tcp --dport {port} --jump DROP"
 
@@ -40,12 +41,11 @@ class EllipticsTest(et.EllipticsTest):
 
 WRITE_TIMEOUT = config.getoption("write_timeout")
 WAIT_TIMEOUT = config.getoption("wait_timeout")
-HOSTS = config.getoption("host")
+nodes = [EllipticsTest.Node(*n.split(':')) for n in config.getoption("node")]
 
-elliptics_test = EllipticsTest(hosts=HOSTS,
+elliptics_test = EllipticsTest(nodes=nodes,
                                write_timeout=WRITE_TIMEOUT,
-                               wait_timeout=WAIT_TIMEOUT,
-                               groups=(1,))
+                               wait_timeout=WAIT_TIMEOUT)
 
 @pytest.fixture(scope='function')
 def write_and_drop_node(request, key_and_data):
@@ -75,10 +75,9 @@ def test_wait_timeout(write_and_drop_node):
 @pytest.fixture(scope='function')
 def write_with_quorum_check(request, key_and_data):
     global elliptics_test
-    elliptics_test = EllipticsTest(hosts=HOSTS,
+    elliptics_test = EllipticsTest(nodes=nodes,
                                    write_timeout=WRITE_TIMEOUT,
-                                   wait_timeout=WAIT_TIMEOUT,
-                                   groups=(1, 2, 3))
+                                   wait_timeout=WAIT_TIMEOUT)
     data = utils.get_data(size=293 * 2**20, randomize_len=False)
     key = utils.get_sha1(data)
 
@@ -90,8 +89,7 @@ def write_with_quorum_check(request, key_and_data):
 
 @pytest.fixture(scope='function')
 def quorum_checker_positive(request, write_with_quorum_check):
-    node = EllipticsTest.Node(host=HOSTS[random.randint(0, len(HOSTS) - 1)],
-                              port=1025)
+    node = random.choice(nodes)
     
     def resume():
         elliptics_test.resume_node(node)
@@ -110,14 +108,7 @@ def test_quorum_checker_positive(quorum_checker_positive):
 
 @pytest.fixture(scope='function')
 def quorum_checker_negative(request, write_with_quorum_check):
-    nodes = []
-    hosts = HOSTS[:]
-    for i in xrange(2):
-        n = random.randint(0, len(hosts) - 1)
-        node = EllipticsTest.Node(host=hosts[n],
-                                  port=1025)
-        nodes.append(node)
-        del hosts[n]
+    dnodes = random.sample(nodes, 2)
     
     def resume():
         for node in nodes:
@@ -142,25 +133,19 @@ def write_and_shuffling_off(request, key_and_data):
     key, data = key_and_data
     
     global elliptics_test
+    # Сбрасываем у конфига по умолчанию флажок шаффлинга групп
     config = elliptics.Config()
     config.flags &= ~elliptics.config_flags.mix_stats
-    print('config', config.flags)
-    elliptics_test = EllipticsTest(hosts=HOSTS,
+
+    elliptics_test = EllipticsTest(nodes=nodes,
                                    write_timeout=WRITE_TIMEOUT,
                                    wait_timeout=WAIT_TIMEOUT,
-                                   groups=(1, 2, 3),
                                    config=config)
 
     elliptics_test.write_data(key, data)
 
-    for h in HOSTS:
-        if '3' in h:
-            host = h
-            break
-
-
-    node = EllipticsTest.Node(host=host,
-                              port=1025)
+    groups = random.sample(elliptics_test.es.get_groups(), 2)
+    node = filter(lambda n: n.group == groups[0], nodes)[0]
 
     elliptics_test.drop_node(node)
     
@@ -169,16 +154,14 @@ def write_and_shuffling_off(request, key_and_data):
 
     request.addfinalizer(resume)
 
-    return key
+    return (key, groups)
     
 
 @pytest.mark.groups_3
 def test_read_from_groups(write_and_shuffling_off):
-    key = write_and_shuffling_off
+    key, groups = write_and_shuffling_off
     
     DELAY = 3.01
     start_time = time.time()
-    elliptics_test.es.read_data_from_groups(key, (3, 2)).get()
+    elliptics_test.es.read_data_from_groups(key, groups).get()
     exec_time = time.time() - start_time
-    print(exec_time)
-

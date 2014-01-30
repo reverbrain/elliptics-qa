@@ -64,15 +64,22 @@ class EllipticsTest:
             "NotExists": "No such file or directory"
             })
     
-    def __init__(self, hosts, write_timeout, wait_timeout, groups=(1,), config=elliptics.Config()):
+    def __init__(self, nodes, write_timeout, wait_timeout, groups=None, config=elliptics.Config()):
         # создаем сессию elliptics'а
         elog = elliptics.Logger("/dev/stderr", 0)
-        node = elliptics.Node(elog, config)
-        node.set_timeouts(write_timeout, wait_timeout)
-        for host in hosts:
-            node.add_remote(host, 1025)
+        client_node = elliptics.Node(elog, config)
+        client_node.set_timeouts(write_timeout, wait_timeout)
+        for node in nodes:
+            client_node.add_remote(node.host, node.port)
 
-        self.es = elliptics.Session(node)
+        self.es = elliptics.Session(client_node)
+
+        if groups is None:
+            groups = set()
+            for n in nodes:
+                groups.add(n.group)
+            groups = list(groups)
+
         self.es.groups = groups
         # запоминаем timestamp для последующих проверок
         self.timestamp = elliptics.Time.now()
