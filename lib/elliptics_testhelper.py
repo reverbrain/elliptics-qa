@@ -64,10 +64,10 @@ class EllipticsTest:
             "NotExists": "No such file or directory"
             })
     
-    def __init__(self, hosts, write_timeout, wait_timeout, groups=(1,)):
+    def __init__(self, hosts, write_timeout, wait_timeout, groups=(1,), config=elliptics.Config()):
         # создаем сессию elliptics'а
         elog = elliptics.Logger("/dev/stderr", 0)
-        node = elliptics.Node(elog)
+        node = elliptics.Node(elog, config)
         node.set_timeouts(write_timeout, wait_timeout)
         for host in hosts:
             node.add_remote(host, 1025)
