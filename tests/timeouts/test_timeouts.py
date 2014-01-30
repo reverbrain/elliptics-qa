@@ -7,7 +7,7 @@ import shlex
 import time
 import random
 
-from hamcrest import assert_that, calling, raises, less_than
+from hamcrest import assert_that, calling, raises, less_than, greater_than, all_of
 
 import elliptics_testhelper as et
 import utils
@@ -23,34 +23,34 @@ class EllipticsTest(et.EllipticsTest):
             self.port = int(port)
             self.group = int(group)
 
-    DROP_RULE = "INPUT --proto tcp --dport {port} --jump DROP"
+    DROP_RULE = "OUTPUT --source {host} --proto tcp --dport {port} --jump DROP"
 
     @staticmethod
     def drop_node(node):
-        cmd = "ssh {host} iptables --append {rule}".format(host=node.host,
-                                                           rule=EllipticsTest.DROP_RULE.format(port=node.port))
+        cmd = "iptables --append {0}".format(EllipticsTest.DROP_RULE.format(host=node.host,
+                                                                            port=node.port))
         subprocess.call(shlex.split(cmd))
 
     @staticmethod
     def resume_node(node):
-        cmd = "ssh {host} iptables --delete {rule}".format(host=node.host,
-                                                           rule=EllipticsTest.DROP_RULE.format(port=node.port))
+        cmd = "iptables --delete {0}".format(EllipticsTest.DROP_RULE.format(host=node.host,
+                                                                            port=node.port))
         subprocess.call(shlex.split(cmd))
 
 
 
-WRITE_TIMEOUT = config.getoption("write_timeout")
 WAIT_TIMEOUT = config.getoption("wait_timeout")
+CHECK_TIMEOUT = config.getoption("check_timeout")
 nodes = [EllipticsTest.Node(*n.split(':')) for n in config.getoption("node")]
 
 elliptics_test = EllipticsTest(nodes=nodes,
-                               write_timeout=WRITE_TIMEOUT,
-                               wait_timeout=WAIT_TIMEOUT)
+                               wait_timeout=WAIT_TIMEOUT,
+                               check_timeout=CHECK_TIMEOUT)
 
 @pytest.fixture(scope='function')
 def write_and_drop_node(request, key_and_data):
     key, data = key_and_data
-    result = elliptics_test.write_data(key, data)
+    result = elliptics_test.write_data_now(key, data)
     node = result.storage_address
     elliptics_test.drop_node(node)
 
@@ -66,24 +66,24 @@ def test_wait_timeout(write_and_drop_node):
 
     DELAY = 3.01
     start_time = time.time()
-    assert_that(calling(elliptics_test.read_data).with_args(key),
+    assert_that(calling(elliptics_test.read_data_now).with_args(key),
                 raises(Exception, 'Connection timed out'))
     exec_time = time.time() - start_time
 
-    assert_that(exec_time, less_than(WRITE_TIMEOUT + DELAY))
+    assert_that(exec_time, less_than(WAIT_TIMEOUT + DELAY))
 
 @pytest.fixture(scope='function')
 def write_with_quorum_check(request, key_and_data):
     global elliptics_test
     elliptics_test = EllipticsTest(nodes=nodes,
-                                   write_timeout=WRITE_TIMEOUT,
-                                   wait_timeout=WAIT_TIMEOUT)
-    data = utils.get_data(size=293 * 2**20, randomize_len=False)
+                                   wait_timeout=WAIT_TIMEOUT,
+                                   check_timeout=CHECK_TIMEOUT)
+    data = utils.get_data(size=450 * 2**20, randomize_len=False)
     key = utils.get_sha1(data)
 
-    elliptics_test.es.set_checker(elliptics.checkers.quorum)
+    elliptics_test.set_checker(elliptics.checkers.quorum)
 
-    res = elliptics_test.es.write_data(key, data)
+    res = elliptics_test.write_data(key, data)
 
     return res
 
@@ -111,12 +111,12 @@ def quorum_checker_negative(request, write_with_quorum_check):
     dnodes = random.sample(nodes, 2)
     
     def resume():
-        for node in nodes:
+        for node in dnodes:
             elliptics_test.resume_node(node)
 
     request.addfinalizer(resume)
 
-    return (write_with_quorum_check, nodes)
+    return (write_with_quorum_check, dnodes)
 
 @pytest.mark.groups_3
 def test_quorum_checker_negative(quorum_checker_negative):
@@ -138,13 +138,13 @@ def write_and_shuffling_off(request, key_and_data):
     config.flags &= ~elliptics.config_flags.mix_stats
 
     elliptics_test = EllipticsTest(nodes=nodes,
-                                   write_timeout=WRITE_TIMEOUT,
                                    wait_timeout=WAIT_TIMEOUT,
+                                   check_timeout=CHECK_TIMEOUT,
                                    config=config)
 
-    elliptics_test.write_data(key, data)
+    elliptics_test.write_data_now(key, data)
 
-    groups = random.sample(elliptics_test.es.get_groups(), 2)
+    groups = random.sample(elliptics_test.get_groups(), 2)
     node = filter(lambda n: n.group == groups[0], nodes)[0]
 
     elliptics_test.drop_node(node)
@@ -161,7 +161,9 @@ def write_and_shuffling_off(request, key_and_data):
 def test_read_from_groups(write_and_shuffling_off):
     key, groups = write_and_shuffling_off
     
-    DELAY = 3.01
     start_time = time.time()
-    elliptics_test.es.read_data_from_groups(key, groups).get()
+    elliptics_test.read_data_from_groups(key, groups).get()
     exec_time = time.time() - start_time
+
+    assert_that(all_of(exec_time, greater_than(WAIT_TIMEOUT),
+                       exec_time, less_than(WAIT_TIMEOUT * 2)))

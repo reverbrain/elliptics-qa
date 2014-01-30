@@ -64,15 +64,15 @@ class EllipticsTest:
             "NotExists": "No such file or directory"
             })
     
-    def __init__(self, nodes, write_timeout, wait_timeout, groups=None, config=elliptics.Config()):
+    def __init__(self, nodes, wait_timeout, check_timeout, groups=None, config=elliptics.Config()):
         # создаем сессию elliptics'а
         elog = elliptics.Logger("/dev/stderr", 0)
         client_node = elliptics.Node(elog, config)
-        client_node.set_timeouts(write_timeout, wait_timeout)
+        client_node.set_timeouts(wait_timeout, check_timeout)
         for node in nodes:
             client_node.add_remote(node.host, node.port)
 
-        self.es = elliptics.Session(client_node)
+        self._session = elliptics.Session(client_node)
 
         if groups is None:
             groups = set()
@@ -80,47 +80,41 @@ class EllipticsTest:
                 groups.add(n.group)
             groups = list(groups)
 
-        self.es.groups = groups
+        self._session.groups = groups
         # запоминаем timestamp для последующих проверок
         self.timestamp = elliptics.Time.now()
 
+    def __getattr__(self, name):
+        return getattr(self._session, name, None)
+
+    @staticmethod
+    def wait_for(async_result):
+        return async_result.get().pop()
+
     # Базовые команды elliptics'а
-    def write_data(self, key, data, offset=0, chunk_size=0):
-        result = self.es.write_data(key, data, offset=offset, chunk_size=chunk_size)
-        result = result.get().pop()
-        return result
+    def write_data_now(self, key, data, offset=0, chunk_size=0):
+        return EllipticsTest.wait_for(self._session.write_data(key, data, offset=offset, chunk_size=chunk_size))
 
-    def read_data(self, key, offset=0, size=0):
-        result = self.es.read_data(key, offset=offset, size=size)
-        result = result.get().pop()
-        return result
+    def read_data_now(self, key, offset=0, size=0):
+        return EllipticsTest.wait_for(self._session.read_data(key, offset=offset, size=size))
     
-    def write_prepare(self, key, data, offset, psize):
-        result = self.es.write_prepare(key, data, offset, psize).get().pop()
-        return result
+    def write_prepare_now(self, key, data, offset, psize):
+        return EllipticsTest.wait_for(self._session.write_prepare(key, data, offset, psize))
 
-    def write_plain(self, key, data, offset):
-        result = self.es.write_plain(key, data, offset).get().pop()
-        return result
+    def write_plain_now(self, key, data, offset):
+        return EllipticsTest.wait_for(self._session.write_plain(key, data, offset))
 
-    def write_commit(self, key, data, offset, csize):
-        result = self.es.write_commit(key, data, offset, csize).get().pop()
-        return result
+    def write_commit_now(self, key, data, offset, csize):
+        return EllipticsTest.wait_for(self._session.write_commit(key, data, offset, csize))
 
     # Методы обеспечивающие проверку корректности отработки команд elliptics'а
     def checking_inaccessibility(self, key, data_len=None):
         """ Проверяет верно ли, что данные не доступны по ключу
         """
         try:
-            result_data = str(self.es.read_data(key).data)
+            result_data = str(self._session.read_data(key).data)
         except Exception as e:
             print e.message
         else:
             print len(result_data), '/', data_len, 'bytes already accessible'
             assert utils.get_sha1(result_data) != key
-
-    def set_user_flags(self, user_flags):
-        """ Устанавливает user_flags атрибут в случайное значение
-        для команд записи
-        """
-        self.es.user_flags = user_flags
