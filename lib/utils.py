@@ -9,7 +9,7 @@ from hamcrest import has_properties, has_property, equal_to, greater_than_or_equ
 
 from os import urandom, environ
 
-MAX_LENGTH = 10 * 2**10	# 10Mb
+MAX_LENGTH = 10 * 2**20
 USER_FLAGS_MAX = 2**64 - 1
 
 def get_data(size=MAX_LENGTH, randomize_len=True):

@@ -56,17 +56,21 @@ def user_flags():
     user_flags = random.randint(0, utils.USER_FLAGS_MAX)
     return user_flags
 
-class EllipticsTest:
+class EllipticsTestHelper:
     """ Класс обеспечивает работу с elliptics'ом на уровне базовых операций.
     """
-    errors = type("Errors", (), {
-            "WrongArguments": "Argument list too long",
-            "NotExists": "No such file or directory"
+    error_info = type("Errors", (), {
+            'WrongArguments': "Argument list too long",
+            'NotExists': "No such file or directory",
+            'TimeoutError': "Connection timed out",
+            'AddrNotExists': "No such device or address"
             })
     
-    def __init__(self, nodes, wait_timeout, check_timeout, groups=None, config=elliptics.Config()):
-        # создаем сессию elliptics'а
-        elog = elliptics.Logger("/dev/stderr", 0)
+    def __init__(self, nodes, wait_timeout, check_timeout, groups=None, config=elliptics.Config(), logging_level=0):
+        if logging_level:
+            elog = elliptics.Logger("/var/log/elliptics/client.log", logging_level)
+        else:
+            elog = elliptics.Logger("/dev/stderr", logging_level)
         client_node = elliptics.Node(elog, config)
         client_node.set_timeouts(wait_timeout, check_timeout)
         for node in nodes:
@@ -91,21 +95,22 @@ class EllipticsTest:
     def wait_for(async_result):
         return async_result.get().pop()
 
-    # Базовые команды elliptics'а
+    # Команды elliptics'а возвращающие результат операции, а не асинхронный результат,
+    # который нужно обрабатывать
     def write_data_now(self, key, data, offset=0, chunk_size=0):
-        return EllipticsTest.wait_for(self._session.write_data(key, data, offset=offset, chunk_size=chunk_size))
+        return EllipticsTestHelper.wait_for(self._session.write_data(key, data, offset=offset, chunk_size=chunk_size))
 
     def read_data_now(self, key, offset=0, size=0):
-        return EllipticsTest.wait_for(self._session.read_data(key, offset=offset, size=size))
+        return EllipticsTestHelper.wait_for(self._session.read_data(key, offset=offset, size=size))
     
     def write_prepare_now(self, key, data, offset, psize):
-        return EllipticsTest.wait_for(self._session.write_prepare(key, data, offset, psize))
+        return EllipticsTestHelper.wait_for(self._session.write_prepare(key, data, offset, psize))
 
     def write_plain_now(self, key, data, offset):
-        return EllipticsTest.wait_for(self._session.write_plain(key, data, offset))
+        return EllipticsTestHelper.wait_for(self._session.write_plain(key, data, offset))
 
     def write_commit_now(self, key, data, offset, csize):
-        return EllipticsTest.wait_for(self._session.write_commit(key, data, offset, csize))
+        return EllipticsTestHelper.wait_for(self._session.write_commit(key, data, offset, csize))
 
     # Методы обеспечивающие проверку корректности отработки команд elliptics'а
     def checking_inaccessibility(self, key, data_len=None):
