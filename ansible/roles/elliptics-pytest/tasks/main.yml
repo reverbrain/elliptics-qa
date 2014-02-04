@@ -3,7 +3,7 @@
   apt: pkg=python-pip
 
 - name: Install Python packages
-  pip: name={{ item }}
+  pip: name={{ item }} use_mirrors=no
   with_items:
      - pytest
      - pytest-xdist
