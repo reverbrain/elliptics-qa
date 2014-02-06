@@ -24,7 +24,7 @@ class EllipticsTestHelper(et.EllipticsTestHelper):
 
     @staticmethod
     def get_nodes_from_args(args):
-        """ Return list of nodes from command line arguments
+        """ Returns list of nodes from command line arguments
         (option '--node')
         """
         return [EllipticsTestHelper.Node(*n.split(':')) for n in args]
@@ -33,7 +33,7 @@ class EllipticsTestHelper(et.EllipticsTestHelper):
 
     @staticmethod
     def drop_node(node):
-        """ Making a node unavailable for elliptics requests
+        """ Makes a node unavailable for elliptics requests
         """
         rule = EllipticsTestHelper.DROP_RULE.format(port=node.port)
         cmd = "ssh {host} iptables --append {rule}".format(host=node.host,
@@ -42,7 +42,7 @@ class EllipticsTestHelper(et.EllipticsTestHelper):
 
     @staticmethod
     def resume_node(node):
-        """ Unlock a node for elliptics requests
+        """ Unlocks a node for elliptics requests
         """
         rule = EllipticsTestHelper.DROP_RULE.format(port=node.port)
         cmd = "ssh {host} iptables --delete {rule}".format(host=node.host,
@@ -71,7 +71,7 @@ nodes = EllipticsTestHelper.get_nodes_from_args(config.getoption("node"))
 
 @pytest.fixture(scope='function')
 def test_helper():
-    """ Preparing default elliptics session for tests
+    """ Prepares default elliptics session for tests
     """
     test_helper = EllipticsTestHelper(nodes=nodes,
                                       wait_timeout=WAIT_TIMEOUT,
