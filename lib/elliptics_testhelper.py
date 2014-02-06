@@ -76,7 +76,9 @@ class EllipticsTestHelper(elliptics.Session):
     
     def __init__(self, nodes, wait_timeout, check_timeout, groups=None, config=elliptics.Config(), logging_level=0):
         if logging_level:
-            os.makedirs(os.path.dirname(self._log_path))
+            dir_path = os.path.dirname(self._log_path)
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
             elog = elliptics.Logger(self._log_path, logging_level)
         else:
             elog = elliptics.Logger("/dev/stderr", logging_level)
