@@ -57,7 +57,7 @@ def timestamp():
 
 @pytest.fixture(scope='function')
 def user_flags():
-    """ Returns randomaly generated user_flags
+    """ Returns randomly generated user_flags
     """
     user_flags = random.randint(0, utils.USER_FLAGS_MAX)
     return user_flags
