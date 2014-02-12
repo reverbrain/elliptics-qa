@@ -99,23 +99,22 @@ class EllipticsTestHelper(elliptics.Session):
 
     @staticmethod
     def wait_for(async_result):
-        return async_result.get().pop()
+        return async_result.get()
 
-    # Elliptics commands, which return the result of operation
-    # (instead of elliptics.AsyncResult)
-    def write_data_now(self, key, data, offset=0, chunk_size=0):
+    # Synchronous versions for Elliptics commands
+    def write_data_sync(self, key, data, offset=0, chunk_size=0):
         return self.wait_for(self.write_data(key, data, offset=offset, chunk_size=chunk_size))
 
-    def read_data_now(self, key, offset=0, size=0):
+    def read_data_sync(self, key, offset=0, size=0):
         return self.wait_for(self.read_data(key, offset=offset, size=size))
     
-    def write_prepare_now(self, key, data, offset, psize):
+    def write_prepare_sync(self, key, data, offset, psize):
         return self.wait_for(self.write_prepare(key, data, offset, psize))
 
-    def write_plain_now(self, key, data, offset):
+    def write_plain_sync(self, key, data, offset):
         return self.wait_for(self.write_plain(key, data, offset))
 
-    def write_commit_now(self, key, data, offset, csize):
+    def write_commit_sync(self, key, data, offset, csize):
         return self.wait_for(self.write_commit(key, data, offset, csize))
 
     # Методы обеспечивающие проверку корректности отработки команд elliptics'а

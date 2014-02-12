@@ -83,7 +83,7 @@ def write_and_drop_node(request, test_helper, key_and_data):
     """ Writes data and drops a node (the one, at which data was written)
     """
     key, data = key_and_data
-    result = test_helper.write_data_now(key, data)
+    result = test_helper.write_data_sync(key, data).pop()
     node = result.storage_address
     test_helper.drop_node(node)
 
@@ -102,7 +102,7 @@ def test_wait_timeout(write_and_drop_node):
     # Additional 3 seconds for functions calls and networking stuff
     DELAY = 3
     start_time = time.time()
-    assert_that(calling(test_helper.read_data_now).with_args(key),
+    assert_that(calling(test_helper.read_data_sync).with_args(key),
                 raises(elliptics.TimeoutError, EllipticsTestHelper.error_info.TimeoutError))
     exec_time = time.time() - start_time
 
@@ -203,7 +203,7 @@ def write_and_shuffling_off(request, key_and_data):
                                       check_timeout=CHECK_TIMEOUT,
                                       config=config)
 
-    test_helper.write_data_now(key, data)
+    test_helper.write_data_sync(key, data)
 
     groups = random.sample(test_helper.get_groups(), 2)
     node = filter(lambda n: n.group == groups[0], nodes)[0]
