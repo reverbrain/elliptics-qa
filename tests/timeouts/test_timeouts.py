@@ -6,6 +6,7 @@ import subprocess
 import shlex
 import time
 import random
+import math
 
 from hamcrest import assert_that, calling, raises, less_than, greater_than, all_of
 
@@ -111,7 +112,7 @@ def test_wait_timeout(write_and_drop_node):
 
 @pytest.fixture(scope='function')
 def write_with_quorum_check(request, test_helper, key_and_data):
-    """ Sets checker (to ckecking by quorum) for elliptics session
+    """ Sets checker (to checking by quorum) for elliptics session
     and starts data writing
     """
     # Data size depends on WAIT_TIMEOUT and networking limitations
@@ -136,15 +137,19 @@ def write_with_quorum_check(request, test_helper, key_and_data):
 
 @pytest.fixture(scope='function')
 def quorum_checker_positive(request, write_with_quorum_check):
-    """ Chooses a random node and drops it
+    """ Chooses random nodes and drops them
+    (nodes_count = ceil(groups_count / 2) - 1)
     """
     test_helper, res = write_with_quorum_check
-    node = random.choice(nodes)
-    
-    test_helper.drop_node(node)
+    dnodes_count = len(nodes) >> 1 - (len(nodes) & 1 ^ 1)
+    dnodes = random.sample(nodes, dnodes_count)
+
+    for node in dnodes:
+        test_helper.drop_node(node)
 
     def teardown():
-        test_helper.resume_node(node)
+        for node in dnodes:
+            test_helper.resume_node(node)
 
     request.addfinalizer(teardown)
 
@@ -153,7 +158,7 @@ def quorum_checker_positive(request, write_with_quorum_check):
 @pytest.mark.groups_3
 def test_quorum_checker_positive(quorum_checker_positive):
     """ Testing that writing will be finished successfully
-    when one of three elliptics groups is unavailable
+    when less than half of elliptics groups are unavailable
     """
     async_result = quorum_checker_positive
 
@@ -161,10 +166,12 @@ def test_quorum_checker_positive(quorum_checker_positive):
 
 @pytest.fixture(scope='function')
 def quorum_checker_negative(request, write_with_quorum_check):
-    """ Chooses two random nodes and drops it
+    """ Chooses random nodes and drops it
+    (nodes_count = ceil(groups_count / 2))
     """
     test_helper, res = write_with_quorum_check
-    dnodes = random.sample(nodes, 2)
+    dnodes_count = int(math.ceil(len(nodes) / 2.0))
+    dnodes = random.sample(nodes, dnodes_count)
     
     for node in dnodes:
         test_helper.drop_node(node)
@@ -180,7 +187,7 @@ def quorum_checker_negative(request, write_with_quorum_check):
 @pytest.mark.groups_3
 def test_quorum_checker_negative(quorum_checker_negative):
     """ Testing that writing will raise the exception
-    when two of three elliptics groups are unavailable
+    when half or more elliptics groups are unavailable
     """
     async_result = quorum_checker_negative
 
@@ -189,7 +196,7 @@ def test_quorum_checker_negative(quorum_checker_negative):
 
 @pytest.fixture(scope='function')
 def write_and_shuffling_off(request, key_and_data):
-    """ Turns off groups shuffling, writes data (in all three groups),
+    """ Turns off groups shuffling, writes data (in all groups),
     chooses two random groups and drops a node from the first random group
     """
     key, data = key_and_data
