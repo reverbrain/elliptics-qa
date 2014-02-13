@@ -97,25 +97,21 @@ class EllipticsTestHelper(elliptics.Session):
 
         self.groups = groups
 
-    @staticmethod
-    def wait_for(async_result):
-        return async_result.get()
-
     # Synchronous versions for Elliptics commands
     def write_data_sync(self, key, data, offset=0, chunk_size=0):
-        return self.wait_for(self.write_data(key, data, offset=offset, chunk_size=chunk_size))
+        return self.write_data(key, data, offset=offset, chunk_size=chunk_size).get()
 
     def read_data_sync(self, key, offset=0, size=0):
-        return self.wait_for(self.read_data(key, offset=offset, size=size))
+        return self.read_data(key, offset=offset, size=size).get()
     
     def write_prepare_sync(self, key, data, offset, psize):
-        return self.wait_for(self.write_prepare(key, data, offset, psize))
+        return self.write_prepare(key, data, offset, psize).get()
 
     def write_plain_sync(self, key, data, offset):
-        return self.wait_for(self.write_plain(key, data, offset))
+        return self.write_plain(key, data, offset).get()
 
     def write_commit_sync(self, key, data, offset, csize):
-        return self.wait_for(self.write_commit(key, data, offset, csize))
+        return self.write_commit(key, data, offset, csize).get()
 
     # Методы обеспечивающие проверку корректности отработки команд elliptics'а
     def checking_inaccessibility(self, key, data_len=None):
