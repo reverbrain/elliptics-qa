@@ -81,6 +81,7 @@ def write_and_drop_node(request, test_helper, key_and_data):
     request.addfinalizer(teardown)
     return test_helper, key
 
+@pytest.mark.groups_1
 def test_wait_timeout(write_and_drop_node):
     """ Testing that reading data (which stores at unavailable node)
     will raise the exception
