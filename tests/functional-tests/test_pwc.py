@@ -13,29 +13,31 @@ from utils import elliptics_result_with
 
 config = pytest.config
 
-WRITE_TIMEOUT = config.getoption("write_timeout")
 WAIT_TIMEOUT = config.getoption("wait_timeout")
+CHECK_TIMEOUT = config.getoption("check_timeout")
 
-HOSTS = config.getoption("host")
+nodes = et.EllipticsTestHelper.get_nodes_from_args(config.getoption("node"))
 
-elliptics_test = et.EllipticsTest(HOSTS, WRITE_TIMEOUT, WAIT_TIMEOUT)
+testhelper = et.EllipticsTestHelper(nodes=nodes,
+                                    wait_timeout=WAIT_TIMEOUT,
+                                    check_timeout=CHECK_TIMEOUT)
 
 def get_length(data):
     return sum(len(i) for i in data)
 
 @pytest.mark.pwctest
 def test_prepare_write_commit(timestamp, user_flags):
-    """ Тест записи по схеме prepare-write-commit
+    """ Testing basic prepare-write-commit writing
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     data = ''.join(data)
 
     assert_that(result, is_(elliptics_result_with(error_code=0,
@@ -45,20 +47,20 @@ def test_prepare_write_commit(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_pwc_inaccessibility(timestamp, user_flags):
-    """ Тест недоступности данных после записи по
-    схеме prepare-write-commit
+    """ Testing that data is inaccessible after write_prepare and write_plain
+    (prepare-write-commit scheme)
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.checking_inaccessibility(key, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.checking_inaccessibility(key, data_len)
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.checking_inaccessibility(key, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.checking_inaccessibility(key, data_len)
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     data = ''.join(data)
 
     assert_that(result, is_(elliptics_result_with(error_code=0,
@@ -68,19 +70,18 @@ def test_pwc_inaccessibility(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_prepare_write_write_commit(timestamp, user_flags):
-    """ Тест записи по схеме pwc общего случая
-    (несколько команд write_plain)
+    """ Testing prepare-write-commit (with multiple write_plain)
     """
     key, data = utils.get_key_and_data_list(list_size=random.randint(4, 10))
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
     for p in xrange(1, len(data) - 1):
-        elliptics_test.write_plain(key, data[p], get_length(data[:p]))
-    elliptics_test.write_commit(key, data[-1], data_len - len(data[-1]), data_len)
+        testhelper.write_plain_sync(key, data[p], get_length(data[:p]))
+    testhelper.write_commit_sync(key, data[-1], data_len - len(data[-1]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     data = ''.join(data)
     
     assert_that(result, is_(elliptics_result_with(error_code=0,
@@ -90,16 +91,16 @@ def test_prepare_write_write_commit(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_prepare_commit(timestamp, user_flags):
-    """ Тест отработки write_prepare-write_commit
+    """ Testing prepare-write-commit (without write_plain)
     """
     key, data = utils.get_key_and_data_list(list_size=2)
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_commit(key, data[1], len(data[0]), data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_commit_sync(key, data[1], len(data[0]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     data = ''.join(data)
     
     assert_that(result, is_(elliptics_result_with(error_code=0,
@@ -109,27 +110,28 @@ def test_prepare_commit(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_commit(key_and_data):
-    """ Тест выполнения команды write_commit по ключу без подготовительных действий
+    """ Testing that write_commit without write_prepare will raise the elliptics.Error
     """
     key, data = key_and_data
 
-    assert_that(calling(elliptics_test.write_commit).with_args(key, data, 0, len(data)),
-                raises(Exception, elliptics_test.errors.NotExists))
+    assert_that(calling(testhelper.write_commit_sync).with_args(key, data, 0, len(data)),
+                raises(elliptics.Error, testhelper.error_info.NotExists))
 
 @pytest.mark.pwctest
 def test_pwc_not_entire_data(timestamp, user_flags):
-    """ Тест записи по схеме pwc psize и csize > data size
+    """ Testing prepare-write-commit
+    when prepare_size and commit_size > data length
     """
     key, data = utils.get_key_and_data_list()
     additional_length = random.randint(1, utils.MAX_LENGTH >> 1)
     data_len = get_length(data) + additional_length
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     
     assert_that(result, has_property('data', has_length(data_len)))
 
@@ -142,81 +144,68 @@ def test_pwc_not_entire_data(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_pwc_more_than_prepared(key_and_data):
-    """ Тест записи по схеме pwc, при попытке записать больше данных
-    чем заготовливаем командой write_prepare (data size > psize)
+    """ Testing prepare-write-commit
+    when data length > prepare_size
     """
     key, data = key_and_data
     data_len = len(data) - 1
 
-    assert_that(calling(elliptics_test.write_prepare).with_args(key, data[0], 0, data_len),
-                raises(Exception, elliptics_test.errors.WrongArguments))
+    assert_that(calling(testhelper.write_prepare_sync).with_args(key, data, 0, data_len),
+                raises(elliptics.Error, testhelper.error_info.WrongArguments))
 
 @pytest.mark.pwctest
 def test_pwc_prepare_with_offset(timestamp, user_flags):
-    """ Тест записи по схеме pwc с начальным offset != 0
+    """ Testing prepare-write-commit with starting offset != 0
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
     offset = random.randint(1, utils.MAX_LENGTH)
 
-    elliptics_test.write_prepare(key, data[0], offset, data_len)
-    elliptics_test.write_plain(key, data[1], offset + len(data[0]))
-    elliptics_test.write_commit(key, data[2], offset + len(data[0]) + len(data[1]), data_len)
-
-    result = elliptics_test.read_data(key)
-    
-    assert_that(result, has_property('data', has_length(offset + data_len)))
-
-    data = str(result.data)[:offset] + ''.join(data)
-
-    assert_that(result, is_(elliptics_result_with(error_code=0,
-                                                  timestamp=timestamp,
-                                                  user_flags=user_flags,
-                                                  data=data)))
+    assert_that(calling(testhelper.write_prepare_sync).with_args(key, data[0], offset, data_len),
+                raises(elliptics.Error, testhelper.error_info.WrongArguments))
 
 @pytest.mark.pwctest
 def test_prepare_writedata():
-    """ Тест отработки последовательного выполнения команд
-    write_prepare-write_data
+    """ Testing that write_data after write_prepare will raise the elliptics.Error
     """
     key, data = utils.get_key_and_data_list(list_size=2)
     data_len = get_length(data)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
 
-    assert_that(calling(elliptics_test.write_data).with_args(key, data[1]),
-                raises(Exception))
+    assert_that(calling(testhelper.write_data_sync).with_args(key, data[1]),
+                raises(elliptics.Error))
 
 @pytest.mark.pwctest
 def test_prepare_write_writedata():
-    """ Тест отработки последовательного выполнения команд
-    write_prepare-write_plain-write_data
+    """ Testing that write_data after (write_prepare, write_plain) will raise the elliptics.Error
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
 
-    assert_that(calling(elliptics_test.write_data).with_args(key, data[2]),
-                raises(Exception))
+    assert_that(calling(testhelper.write_data_sync).with_args(key, data[2]),
+                raises(elliptics.Error))
 
 @pytest.mark.pwctest
 def test_pwc_psize_more_than_csize(timestamp, user_flags):
-    """ Тест записи данных при psize > csize (psize > data_len)
+    """ Testing prepare-write-commit
+    when data length < prepare_size > commit_size
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
     add_len = random.randint(1, utils.MAX_LENGTH >> 1)
-    elliptics_test.write_prepare(key, data[0], 0, data_len + add_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len + add_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), data_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     
     data = ''.join(data)
 
@@ -227,45 +216,48 @@ def test_pwc_psize_more_than_csize(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_pwc_psize_more_than_csize_negative():
-    """ Тест записи данных при psize > csize (csize < data_len)
+    """ Testing prepare-write-commit
+    when prepare_size > commit_size < data length
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
 
     sub_len = random.randint(1, data_len - 1)
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
 
-    assert_that(calling(elliptics_test.write_commit).with_args(key, data[2], len(data[0]) + len(data[1]), data_len - sub_len),
-                raises(Exception))
+    assert_that(calling(testhelper.write_commit_sync).with_args(key, data[2], len(data[0]) + len(data[1]), data_len - sub_len),
+                raises(elliptics.Error))
 
 @pytest.mark.pwctest
 def test_pwc_psize_less_than_csize_negative():
-    """ Тест записи данных при psize < csize (psize < data_len)
+    """ Testing prepare-write-commit
+    when data length < prepare_size < commit_size
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
 
     sub_len = random.randint(1, len(data[1]) + len(data[2]) - 1)
-    elliptics_test.write_prepare(key, data[0], 0, data_len - sub_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len - sub_len)
 
-    assert_that(calling(elliptics_test.write_plain).with_args(key, data[1], len(data[0])),
-                raises(Exception))
+    assert_that(calling(testhelper.write_plain_sync).with_args(key, data[1], len(data[0])),
+                raises(elliptics.Error))
 
 @pytest.mark.pwctest
 def test_pwc_psize_less_than_csize(timestamp, user_flags):
-    """ Тест записи данных при psize < csize (csize > data_len)
+    """ Testing prepare-write-commit
+    when prepare_size < commit_size > data length
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
     add_len = random.randint(1, utils.MAX_LENGTH)
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len + add_len)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), data_len + add_len)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     
     assert_that(result, has_property('data', has_length(data_len + add_len)))
 
@@ -278,38 +270,30 @@ def test_pwc_psize_less_than_csize(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_pwc_null_psize(timestamp, user_flags):
-    """ Тест записи данных при psize == 0
+    """ Testing prepare-write-commit
+    when prepare_size = 0
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, 0)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), data_len)
-
-    result = elliptics_test.read_data(key)
-    
-    data = ''.join(data)
-
-    assert_that(result, is_(elliptics_result_with(error_code=0,
-                                                  timestamp=timestamp,
-                                                  user_flags=user_flags,
-                                                  data=data)))
+    assert_that(calling(testhelper.write_prepare_sync).with_args(key, data[0], 0, 0),
+                raises(elliptics.Error, testhelper.error_info.WrongArguments))
 
 @pytest.mark.pwctest
 def test_pwc_null_csize(timestamp, user_flags):
-    """ Тест записи данных при csize == 0
+    """ Testing prepare-write-commit
+    when commit_size = 0
     """
     key, data = utils.get_key_and_data_list()
     data_len = get_length(data)
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_prepare(key, data[0], 0, data_len)
-    elliptics_test.write_plain(key, data[1], len(data[0]))
-    elliptics_test.write_commit(key, data[2], len(data[0]) + len(data[1]), 0)
+    testhelper.write_prepare_sync(key, data[0], 0, data_len)
+    testhelper.write_plain_sync(key, data[1], len(data[0]))
+    testhelper.write_commit_sync(key, data[2], len(data[0]) + len(data[1]), 0)
 
-    result = elliptics_test.read_data(key)
+    result = testhelper.read_data_sync(key).pop()
     
     data = ''
 
@@ -320,10 +304,9 @@ def test_pwc_null_csize(timestamp, user_flags):
 
 @pytest.mark.pwctest
 def test_pwc_prepare_less_than_data1(key_and_data):
-    """ Тест записи данных при попытке записи больше данных чем psize
-    при выполнении write_prepare (data1 size > psize)
+    """ Testing that write_prepare with data length > prepare_size will raise the elliptics.Error
     """
     key, data = key_and_data
 
-    assert_that(calling(elliptics_test.write_prepare).with_args(key, data, 0, len(data) - 1),
-                raises(Exception, elliptics_test.errors.WrongArguments))
+    assert_that(calling(testhelper.write_prepare_sync).with_args(key, data, 0, len(data) - 1),
+                raises(Exception, testhelper.error_info.WrongArguments))

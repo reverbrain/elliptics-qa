@@ -7,14 +7,14 @@ import os
 
 import utils
 
-# Позиция offset'а при записи
+# offset position (writing)
 OffsetWriteGetter = {'BEGINNING':     lambda l: 0,
                      'MIDDLE':        lambda l: random.randint(1, l - 2),
                      'END':           lambda l: random.randint(1, l - 1),
                      'APPENDING':     lambda l: l,
                      'OVER_BOUNDARY': lambda l: random.randint(l + 1, utils.MAX_LENGTH + 2)}
 
-# Значение size'а при чтении
+# size value (reading)
 SizeGetter = {'NULL':      lambda l, os=None: 0,
               'DATA_SIZE': lambda l, os=None: l,
               'PART':      lambda l, os=None: random.randint(1, l - 1),
@@ -22,18 +22,18 @@ SizeGetter = {'NULL':      lambda l, os=None: 0,
               'PART_DEPEND_ON_OFFSET_VALID':   lambda l, os=None: random.randint(1, l - os),
               'PART_DEPEND_ON_OFFSET_INVALID': lambda l, os=None: random.randint(l - os + 1, l)}
 
-# Offset для чтения
+# offset position (reading)
 OffsetReadGetter = {'NULL':          lambda l: 0,
                     'MIDDLE':        lambda l: random.randint(1, l - 1),
                     'OVER_BOUNDARY': lambda l: random.randint(l + 1, utils.MAX_LENGTH + 2)}
 
-# Значение chunk_size'а при записи
+# chunk_size (writing)
 ChunkSizeGetter = {'NULL':      lambda l: 0,
                    'MIDDLE':    lambda l: random.randint(1, l - 1),
                    'DATA_SIZE': lambda l: l,
                    'OVER_SIZE': lambda l: random.randint(l + 1, utils.MAX_LENGTH + 2)}
 
-# Значение длины данных, при записи по offset'у
+# data length (writing with offset)
 OffsetDataGetter = {'BEGINNING':     lambda l, os: random.randint(1, l - os - 1),
                     'MIDDLE':        lambda l, os: random.randint(1, l - os - 1),
                     'END':           lambda l, os: l - os,
@@ -44,9 +44,7 @@ OffsetDataGetter = {'BEGINNING':     lambda l, os: random.randint(1, l - os - 1)
 def key_and_data():
     """ Returns key and data (random sequence of bytes)
     """
-    data = utils.get_data()
-    key = utils.get_sha1(data)
-    return (key, data)
+    return utils.get_key_and_data()
 
 @pytest.fixture(scope='function')
 def timestamp():
@@ -65,6 +63,12 @@ def user_flags():
 class EllipticsTestHelper(elliptics.Session):
     """ This class extend elliptics.Session class with some useful (for tests) features
     """
+    class Node(object):
+        def __init__(self, host, port, group):
+            self.host = host
+            self.port = int(port)
+            self.group = int(group)
+
     error_info = type("Errors", (), {
             'WrongArguments': "Argument list too long",
             'NotExists': "No such file or directory",
@@ -74,7 +78,8 @@ class EllipticsTestHelper(elliptics.Session):
 
     _log_path = "/var/log/elliptics/client.log"
     
-    def __init__(self, nodes, wait_timeout, check_timeout, groups=None, config=elliptics.Config(), logging_level=0):
+    def __init__(self, nodes, wait_timeout, check_timeout,
+                 groups=None, config=elliptics.Config(), logging_level=0):
         if logging_level:
             dir_path = os.path.dirname(self._log_path)
             if not os.path.exists(dir_path):
@@ -97,6 +102,13 @@ class EllipticsTestHelper(elliptics.Session):
 
         self.groups = groups
 
+    @staticmethod
+    def get_nodes_from_args(args):
+        """ Returns list of nodes from command line arguments
+        (option '--node')
+        """
+        return [EllipticsTestHelper.Node(*n.split(':')) for n in args]
+
     # Synchronous versions for Elliptics commands
     def write_data_sync(self, key, data, offset=0, chunk_size=0):
         return self.write_data(key, data, offset=offset, chunk_size=chunk_size).get()
@@ -113,9 +125,9 @@ class EllipticsTestHelper(elliptics.Session):
     def write_commit_sync(self, key, data, offset, csize):
         return self.write_commit(key, data, offset, csize).get()
 
-    # Методы обеспечивающие проверку корректности отработки команд elliptics'а
+
     def checking_inaccessibility(self, key, data_len=None):
-        """ Проверяет верно ли, что данные не доступны по ключу
+        """ Checking that data is inaccessible
         """
         try:
             result_data = str(self._session.read_data(key).data)

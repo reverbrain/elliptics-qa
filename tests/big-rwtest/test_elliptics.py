@@ -1,52 +1,41 @@
-# -*- coding: utf8 -*-
+# -*- coding: utf-8 -*-
 
 import elliptics
 import hashlib
 import random
 import pytest
 import os
+
 from collections import defaultdict
+
+import elliptics_testhelper as et
+
+from utils import get_key_and_data, get_sha1
 
 MIN_SIZE = 100
 MAX_SIZE = 1000
 config = pytest.config
 BATCH_SIZE = config.getoption('batch_size') 
 BATCH_NUMBER = config.getoption('batch_number') 
-WRITE_TIMEOUT = config.getoption('write_timeout') 
+CHECK_TIMEOUT = config.getoption('check_timeout') 
 WAIT_TIMEOUT = config.getoption('wait_timeout') 
-HOSTS = config.getoption('host')
-keys = set()
+nodes = et.EllipticsTestHelper.get_nodes_from_args(config.getoption("node"))
 
-def create_random_file(size):
-    data = os.urandom(size)
-    key = get_sha1(data)
-    return key, data
-
-def get_sha1(data):
-    m = hashlib.sha1()
-    m.update(data)
-    return m.hexdigest()
-
-# Настройка сессии с Elliptics
-elog = elliptics.Logger("/dev/stderr", 0)
-node = elliptics.Node(elog)
-node.set_timeouts(WRITE_TIMEOUT, WAIT_TIMEOUT)
-for host in HOSTS:
-    node.add_remote(host, 1025)
-s = elliptics.Session(node)
-s.groups = [1]
-ids_batches = []
+s = et.EllipticsTestHelper(nodes=nodes, wait_timeout=WAIT_TIMEOUT, check_timeout=CHECK_TIMEOUT)
 timestamp = elliptics.Time.now()
+
+ids_batches = []
+keys = set()
 
 @pytest.fixture()
 def put_keys(request):
     for i in xrange(BATCH_NUMBER):
         ids = []
         results = []
-        # Генерация и асинхронная запись пачки файлов
+        # Generate and asynchronous writing a bunch of data
         for j in xrange(BATCH_SIZE):
             size = random.randint(MIN_SIZE, MAX_SIZE)
-            key, data = create_random_file(size)
+            key, data = get_key_and_data(size, randomize_len=False)
             elliptics_id = elliptics.Id(key)
             ids.append(elliptics_id)
             result = s.write_data(elliptics_id, data)

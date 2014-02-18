@@ -5,4 +5,4 @@
        dest={{ repo_dir }}
 
 - name: Run test
-  shell: 'PYTHONPATH={{ repo_dir }}/lib:$PYTHONPATH py.test -v -rxs -m ''{{ testgroup }}'' --write_timeout={{ wait_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups["elliptics"] %} --host={{ host }} {% endfor %} {{ repo_dir }}/tests/functional-tests/'
+  shell: PYTHONPATH={{ repo_dir }}/lib:$PYTHONPATH py.test -v -rxs -m ''{{ testgroup }}'' --check_timeout={{ check_timeout }} --wait_timeout={{ wait_timeout }} {% for host in groups["elliptics"] %} --node={{ host }}:1025:{{ hostvars[host]["group"] }} {% endfor %} {{ repo_dir }}/tests/functional-tests/

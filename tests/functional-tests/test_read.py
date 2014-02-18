@@ -15,22 +15,24 @@ from testcases import size_type_list, offset_type_positive_list, offset_type_neg
 
 config = pytest.config
 
-WRITE_TIMEOUT = config.getoption("write_timeout")
 WAIT_TIMEOUT = config.getoption("wait_timeout")
+CHECK_TIMEOUT = config.getoption("check_timeout")
 
-HOSTS = config.getoption("host")
+nodes = et.EllipticsTestHelper.get_nodes_from_args(config.getoption("node"))
 
-elliptics_test = et.EllipticsTest(HOSTS, WRITE_TIMEOUT, WAIT_TIMEOUT)
+testhelper = et.EllipticsTestHelper(nodes=nodes,
+                                    wait_timeout=WAIT_TIMEOUT,
+                                    check_timeout=CHECK_TIMEOUT)
 
 @pytest.mark.readtest
 def test_write_read(key_and_data, timestamp, user_flags):
-    """ Тест чтения-записи данных целиком
+    """ Testing basic writing and reading
     """
     key, data = key_and_data
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
     
-    elliptics_test.write_data(key, data)
-    result = elliptics_test.read_data(key)
+    testhelper.write_data_sync(key, data)
+    result = testhelper.read_data_sync(key).pop()
 
     assert_that(result, is_(elliptics_result_with(error_code=0,
                                                   timestamp=timestamp,
@@ -40,14 +42,14 @@ def test_write_read(key_and_data, timestamp, user_flags):
 @pytest.mark.readtest
 @pytest.mark.parametrize("size_type", size_type_list)
 def test_read_with_size(size_type, key_and_data, timestamp, user_flags):
-    """ Тест чтения с параметром size
+    """ Testing read command (with size)
     """
     key, data = key_and_data
     size = et.SizeGetter[size_type](len(data))
-    elliptics_test.set_user_flags(user_flags)
+    testhelper.set_user_flags(user_flags)
 
-    elliptics_test.write_data(key, data)
-    result = elliptics_test.read_data(key, size=size)
+    testhelper.write_data_sync(key, data)
+    result = testhelper.read_data_sync(key, size=size).pop()
 
     if not size:
         size = len(data)
@@ -61,15 +63,15 @@ def test_read_with_size(size_type, key_and_data, timestamp, user_flags):
 @pytest.mark.readtest
 @pytest.mark.parametrize("offset_type", offset_type_positive_list)
 def test_read_with_offset_positive(offset_type, key_and_data, timestamp, user_flags):
-    """ Тест чтения с параметром offset на positive тест-кейсах
+    """ Testing read command (with offset) (positive test cases)
     """
     key, data = key_and_data
     offset = et.OffsetReadGetter[offset_type](len(data))
-    elliptics_test.set_user_flags(user_flags)
-    # подготавливаем данные для чтения
-    elliptics_test.write_data(key, data)
+    testhelper.set_user_flags(user_flags)
+
+    testhelper.write_data_sync(key, data)
     
-    result = elliptics_test.read_data(key, offset=offset)
+    result = testhelper.read_data_sync(key, offset=offset).pop()
 
     data = data[offset:]
 
@@ -81,29 +83,29 @@ def test_read_with_offset_positive(offset_type, key_and_data, timestamp, user_fl
 @pytest.mark.readtest
 @pytest.mark.parametrize("offset_type", offset_type_negative_list)
 def test_read_with_offset_negative(offset_type, key_and_data):
-    """ Тест чтения с параметром offset на negative тест-кейсах
+    """ Testing read command (with offset) (negative test cases)
     """
     key, data = key_and_data
     offset = et.OffsetReadGetter[offset_type](len(data))
-    # подготавливаем данные для чтения
-    elliptics_test.write_data(key, data)
 
-    assert_that(calling(elliptics_test.read_data).with_args(key, offset=offset),
-                raises(Exception, elliptics_test.errors.WrongArguments))
+    testhelper.write_data_sync(key, data)
+
+    assert_that(calling(testhelper.read_data_sync).with_args(key, offset=offset),
+                raises(Exception, testhelper.error_info.WrongArguments))
 
 @pytest.mark.readtest
 @pytest.mark.parametrize(("offset_type", "size_type"), offset_and_size_types_positive_list)
 def test_read_with_offset_and_size_positive(offset_type, size_type,
                                             key_and_data, timestamp, user_flags):
-    """ Тест чтения с параметрами offset и size на positive тест-кейсах
+    """ Testing read command (with offset and size) (positive test cases)
     """
     key, data = key_and_data
     offset = et.OffsetReadGetter[offset_type](len(data))
     size = et.SizeGetter[size_type](len(data), offset)
-    elliptics_test.set_user_flags(user_flags)
-    # подготавливаем данные для чтения
-    elliptics_test.write_data(key, data)
-    result = elliptics_test.read_data(key, offset=offset, size=size)
+    testhelper.set_user_flags(user_flags)
+
+    testhelper.write_data_sync(key, data)
+    result = testhelper.read_data_sync(key, offset=offset, size=size).pop()
 
     if not size:
         size = len(data)
@@ -117,13 +119,13 @@ def test_read_with_offset_and_size_positive(offset_type, size_type,
 @pytest.mark.readtest
 @pytest.mark.parametrize(("offset_type", "size_type"), offset_and_size_types_negative_list)
 def test_read_with_offset_and_size_negative(offset_type, size_type, key_and_data):
-    """ Тест чтения с параметрами offset и size на negative тест-кейсах
+    """ Testing read command (with offset and size) (negative test cases)
     """
     key, data = key_and_data
     offset = et.OffsetReadGetter[offset_type](len(data))
     size = et.SizeGetter[size_type](len(data), offset)
-    # подготавливаем данные для чтения
-    elliptics_test.write_data(key, data)
 
-    assert_that(calling(elliptics_test.read_data).with_args(key, offset=offset, size=size),
-                raises(Exception, elliptics_test.errors.WrongArguments))
+    testhelper.write_data_sync(key, data)
+
+    assert_that(calling(testhelper.read_data_sync).with_args(key, offset=offset, size=size),
+                raises(Exception, testhelper.error_info.WrongArguments))

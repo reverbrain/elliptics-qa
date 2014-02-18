@@ -1,7 +1,7 @@
 ---
 - name: Getting tests from repository
   git: repo=git://github.com/kis8ya/elliptics-qa.git
-       version=features/test-timeouts
+       version=features/new-tests
        dest={{ repo_dir }}
 
 - name: Run test

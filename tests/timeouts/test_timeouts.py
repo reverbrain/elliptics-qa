@@ -17,19 +17,6 @@ from elliptics_testhelper import key_and_data
 from utils import MB
 
 class EllipticsTestHelper(et.EllipticsTestHelper):
-    class Node(object):
-        def __init__(self, host, port, group):
-            self.host = host
-            self.port = int(port)
-            self.group = int(group)
-
-    @staticmethod
-    def get_nodes_from_args(args):
-        """ Returns list of nodes from command line arguments
-        (option '--node')
-        """
-        return [EllipticsTestHelper.Node(*n.split(':')) for n in args]
-
     DROP_RULE = "INPUT --proto tcp --destination-port {port} --jump DROP"
 
     @staticmethod
