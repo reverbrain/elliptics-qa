@@ -1,3 +1,8 @@
 ---
 elliptics_version: newest
 eblob_version: newest
+log_dir: /var/log/elliptics
+data_dir: /opt/elliptics
+hist_dir: /tmp/history
+remote_packages_dir: /root/pkgs
+config: /etc/elliptics.conf

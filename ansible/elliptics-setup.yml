@@ -1,15 +1,12 @@
 ---
-- hosts: all
+- hosts: elliptics-test
   roles:
     - host-preparation
 
-- hosts: elliptics
-  roles:
-    - elliptics-common
-    - elliptics-3nodes1group
+    - {role: elliptics-install-packages, when: packages_dir is defined}
+
+    - {role: elliptics-common, when: packages_dir is not defined}
 
 - hosts: elliptics-client
   roles:
-    - elliptics-client
     - elliptics-pytest
-

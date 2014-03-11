@@ -1,0 +1,26 @@
+---
+- name: Make directory for packages
+  file: path={{ remote_packages_dir }} state=directory
+
+- name: Copy elliptics packages
+  copy: src={{ item }} dest="{{ remote_packages_dir }}/"
+  with_fileglob:
+    - "{{ packages_dir }}/*"
+
+- name: Getting packages list
+  shell: ls {{ remote_packages_dir }}
+  register: packages_list
+
+- name: Install elliptics packages
+  shell: dpkg --force-depends --install "{{ remote_packages_dir }}/{{ item }}"
+  with_items: packages_list.stdout_lines
+
+- name: Install elliptics packages dependencies
+  shell: apt-get --fix-broken --assume-yes install
+
+- name: Create necessary directories
+  file: path={{ item }} state=directory
+  with_items:
+    - "{{ log_dir }}"
+    - "{{ data_dir }}"
+    - "{{ hist_dir }}"
