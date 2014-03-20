@@ -1,0 +1,45 @@
+---
+- hosts: all
+  tasks:
+    - name: Set hostname
+      shell: echo "127.0.0.1 {{ inventory_hostname }} {{ inventory_hostname_short }} localhost" > /etc/hosts; hostname {{ inventory_hostname_short }}
+
+    - name: Perform 'apt-get update'
+      apt: update_cache=yes
+
+- hosts: all
+  roles:
+    - {role: install-elliptics-local-packages, when: packages_dir is defined}
+
+    - {role: install-elliptics-packages, when: packages_dir is not defined}
+
+- hosts: servers
+  tasks:
+    - name: Create necessary directories
+      file: path={{ item }} state=directory
+      with_items:
+        - "{{ log_dir }}"
+        - "{{ data_dir }}"
+        - "{{ hist_dir }}"
+
+- hosts: clients
+  tasks:
+    - name: Install debian packages
+      apt: pkg={{ item }}
+      with_items:
+        - python-pip
+        - wondershaper
+
+    - name: Install Python packages
+      pip: name={{ item }} use_mirrors=no
+      with_items:
+        - pytest
+        - pytest-xdist
+        - pyhamcrest
+        - requests
+
+    - name: Copy test files
+      copy: src={{ repo_dir }}/tests dest={{ remote_repo_dir }}
+
+    - name: Copy lib files
+      copy: src={{ repo_dir }}/lib dest={{ remote_repo_dir }}

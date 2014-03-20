@@ -1,6 +1,0 @@
----
-- name: Stop Elliptics daemon
-  shell: pkill dnet_ioserv
-
-- name: Wait for Elliptics to stop
-  pause: seconds=10

@@ -1,4 +1,4 @@
 ---
-- hosts: elliptics-client
+- hosts: clients
   roles:
     - functional-tests

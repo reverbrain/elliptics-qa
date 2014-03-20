@@ -1,0 +1,12 @@
+---
+- hosts: servers
+  tasks:
+    - name: Getting process id
+      shell: pgrep dnet_ioserv
+      register: pid
+
+    - name: Stop Elliptics daemon
+      shell: pkill dnet_ioserv
+
+    - name: Wait for Elliptics to stop
+      shell: while [ -e /proc/{{ pid.stdout }} ]; do sleep 0.1; done

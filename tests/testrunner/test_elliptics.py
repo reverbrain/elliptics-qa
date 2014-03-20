@@ -6,3 +6,4 @@ def test_name(request):
 
 def test_elliptics(test_name):
     pytest.testrunner.run(test_name)
+

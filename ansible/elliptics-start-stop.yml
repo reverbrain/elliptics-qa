@@ -1,5 +1,0 @@
----
-- hosts: elliptics
-  roles:
-    - { role: elliptics-start, when: cmd == 'start'}
-    - { role: elliptics-stop, when: cmd == 'stop'}

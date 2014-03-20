@@ -1,5 +1,0 @@
----
-check_timeout: 30
-repo_dir: /root/elliptics-qa
-testgroup: groups_1
-wait_timeout: 25
