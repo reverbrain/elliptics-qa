@@ -7,7 +7,8 @@ for f in session.get_flavors_list():
     flavors[f['name']] = f['ram']
 
 def create(instances_cfg):
-    session.create_instances(instances_cfg)
+#    session.create_instances(instances_cfg)
+    session.rebuild_instances(instances_cfg)
 
 def delete(instances_cfg):
     session.delete_instances(instances_cfg)

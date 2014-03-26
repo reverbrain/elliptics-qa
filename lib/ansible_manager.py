@@ -21,11 +21,13 @@ def set_vars(vars_path, params):
         content = yaml.dump(params, explicit_start=True, default_flow_style=False)
         f.write(content)
 
+def update_vars(vars_path, params):
+    vars = get_vars(vars_path)
+    vars.update(params)
+    set_vars(vars_path, vars)
+
 def run_playbook(playbook, inventory=None):
-    if inventory is None:
-        cmd = "ansible-playbook -v -i {0}.hosts {0}.yml".format(playbook)
-    else:
-        cmd = "ansible-playbook -v -i {0} {1}.yml".format(inventory, playbook)
+    cmd = "ansible-playbook -v -i {0} {1}.yml".format(inventory, playbook)
     print("DEBUG: {0}".format(cmd))
 
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)

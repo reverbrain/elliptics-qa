@@ -1,3 +1,13 @@
 ---
 - name: Run test
-  shell: PYTHONPATH={{ remote_repo_dir }}/lib:$PYTHONPATH py.test -v -rxs -m "{{ testgroup }}" --wait_timeout={{ wait_timeout }} --check_timeout={{ check_timeout }} {% for host in groups['servers'] %} --node={{ host }}:1025:{{ hostvars[host]["group"] }} {% endfor %} {{ remote_repo_dir }}/tests/timeouts/
+  shell: >
+    PYTHONPATH={{ remote_repo_dir }}/lib:$PYTHONPATH
+    py.test
+    -v -rxs
+    -m "{{ testgroup }}"
+    --wait_timeout={{ wait_timeout }}
+    --check_timeout={{ check_timeout }}
+    {% for host in groups['servers'] %}
+    --node={{ host }}:1025:{{ hostvars[host]["group"] }}
+    {% endfor %}
+    {{ remote_repo_dir }}/tests/timeouts/

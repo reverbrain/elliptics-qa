@@ -1,3 +1,0 @@
----
-- name: Install Elliptics Client
-  apt: pkg=elliptics-client={{ elliptics_version }}

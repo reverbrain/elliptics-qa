@@ -10,8 +10,7 @@ import ansible_manager
 import instances_manager
 
 def pytest_addoption(parser):
-    parser.addoption('--test', type="string", action="append", dest="test", default=None,
-                     help='Example: --test="{test_name: {"test_params": {...}, "test_env_cfg": {...}}}')
+    parser.addoption('--testsuite-params', type="string", action="store", dest="testsuite_params", default="{}")
     parser.addoption('--repo-dir', type="string", action="store", dest="repo_dir", default=None)
     parser.addoption('--packages-dir', type="string", action="store", dest="pkgs_dir", default=None)
     parser.addoption('--tag', type="string", action="append", dest="tag", default=None)
@@ -34,6 +33,7 @@ class TestRunner(object):
         self.pkgs_dir = config.option.pkgs_dir
         self.tests_dir = os.path.join(self.repo_dir, "tests")
         self.ansible_dir = os.path.join(self.repo_dir, "ansible")
+        self.testsuite_params = json.loads(config.option.testsuite_params, object_hook=self._decode_value)
 
         self.playbooks = {'base_setup': "test-env-prepare",
                           'elliptics_start': "elliptics-start",
@@ -52,10 +52,18 @@ class TestRunner(object):
     # pytest hooks
     def pytest_unconfigure(self, config):
         if self.delete_nodes:
-            instances_manager.delete(self.instances_cfg)
+            print("don't delete instances - rebuild them plz")
+#            instances_manager.delete(self.instances_cfg)
 
     def pytest_runtest_setup(self, item):
         self.test_name = re.split("[\[\]]", item.name)[1]
+
+        test = self.tests[self.test_name]
+        # Prepare test environment for a specific test
+        if test["test_env_cfg"].get("prepare_env"):
+            ansible_manager.run_playbook(self._abspath(test["test_env_cfg"]["prepare_env"]),
+                                         self._get_inventory_path(self.test_name))
+        
         # Run elliptics process on all servers
         ansible_manager.run_playbook(self._abspath(self.playbooks['elliptics_start']),
                                      self._get_inventory_path(self.test_name))
@@ -68,36 +76,30 @@ class TestRunner(object):
     def prepare_base_environment(self, option):
         """ Prepares base test environment
         """
-        self.collect_tests(option.test, option.tag)
+        self.collect_tests(option.tag)
         self.collect_instances_params()
         self.instances_cfg = instances_manager.get_instances_cfg(self.instances_params,
                                                                  self.instances_names)
 
+        self.prepare_ansible_test_files()
         instances_manager.create(self.instances_cfg)
         self.install_elliptics_packages()
-        self.prepare_ansible_test_files()
 
-    def collect_tests(self, tests, tags):
+    def collect_tests(self, tags):
         """ Collects information about tests to run
         """
         self.tests = {}
-        if tests is None:
-            # Collect all tests with certain tags
-            # (if tests were not specified)
-            tests_dirs = [os.path.join(self.tests_dir, s) for s in os.listdir(self.tests_dir)
-                          if os.path.isdir(os.path.join(self.tests_dir, s))]
+        # Collect all tests with specific tags
+        tests_dirs = [os.path.join(self.tests_dir, s) for s in os.listdir(self.tests_dir)
+                      if os.path.isdir(os.path.join(self.tests_dir, s))]
 
-            for test_dir in tests_dirs:
-                for cfg_file in glob.glob(os.path.join(test_dir, "test_*.cfg")):
-                    cfg = json.load(open(cfg_file), object_hook=self._decode_value)
-                    if set(cfg["tags"]).intersection(set(tags)):
-                        # test config name format: "test_NAME.cfg"
-                        test_name = cfg_file.split('/')[-1][5:-4]
-                        self.tests[test_name] = cfg
-        else:
-            # Convert list of tests (from command line args)
-            for t in [json.loads(t, object_hook=self._decode_value) for t in tests]:
-                self.tests.update(t)
+        for test_dir in tests_dirs:
+            for cfg_file in glob.glob(os.path.join(test_dir, "test_*.cfg")):
+                cfg = json.load(open(cfg_file), object_hook=self._decode_value)
+                if set(cfg["tags"]).intersection(set(tags)):
+                    # test config name format: "test_NAME.cfg"
+                    test_name = cfg_file.split('/')[-1][5:-4]
+                    self.tests[test_name] = cfg
 
     def collect_instances_params(self):
         """ Collects information about clients and servers
@@ -121,7 +123,7 @@ class TestRunner(object):
         """
         inventory_path = self._get_inventory_path(self.playbooks['base_setup'])
         groups = ansible_manager._get_groups_names("setup")
-
+        
         ansible_manager.generate_inventory_file(inventory_path=inventory_path,
                                                 clients_count=self.instances_params["clients"]["count"],
                                                 servers_per_group=[self.instances_params["servers"]["count"]],
@@ -129,31 +131,39 @@ class TestRunner(object):
                                                 instances_names=self.instances_names)
 
         vars_path = self._get_vars_path('clients')
-        ansible_manager.set_vars(vars_path=vars_path,
-                                 params={"repo_dir": self.repo_dir})
+        ansible_manager.update_vars(vars_path=vars_path,
+                                    params={"repo_dir": self.repo_dir})
 
         if self.pkgs_dir:
-            vars_path = self._get_vars_path('test')
-            ansible_manager.set_vars(vars_path=vars_path,
-                                     params={"packages_dir": self.pkgs_dir})
+            ansible_manager.update_vars(vars_path=self._get_vars_path('test'),
+                                        params={"packages_dir": self.pkgs_dir})
 
-        ansible_manager.run_playbook(self._abspath(self.playbooks['base_setup']))
+        ansible_manager.run_playbook(self._abspath(self.playbooks['base_setup']),
+                                     inventory_path)
 
     def prepare_ansible_test_files(self):
         """ Prepares ansible inventory and vars files for the tests
         """
+        # set global params for test suite
+        if self.testsuite_params.get("_global"):
+            ansible_manager.update_vars(vars_path=self._get_vars_path('test'),
+                                        params=self.testsuite_params["_global"])
+
         for name, cfg in self.tests.items():
             groups = ansible_manager._get_groups_names(name)
             inventory_path = self._get_inventory_path(name)
+
             ansible_manager.generate_inventory_file(inventory_path=inventory_path,
                                                     clients_count=cfg["test_env_cfg"]["clients"]["count"],
                                                     servers_per_group=cfg["test_env_cfg"]["servers"]["count_per_group"],
                                                     groups=groups,
                                                     instances_names=self.instances_names)
 
-            vars_path = self._get_vars_path(groups['clients'])
-            ansible_manager.set_vars(vars_path=vars_path,
-                                     params=cfg["params"])
+            params = cfg["params"]
+            if name in self.testsuite_params:
+                params.update(self.testsuite_params[name])
+            vars_path = self._get_vars_path(groups['test'])
+            ansible_manager.set_vars(vars_path=vars_path, params=params)
 
     def _abspath(self, path):
         abs_path = os.path.join(self.ansible_dir, path)

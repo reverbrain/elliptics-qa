@@ -11,7 +11,7 @@
        version={{ grape_version }}
 
 - name: Install build dependencies
-  apt: pkg={{ item }}
+  apt: pkg={{ item }} force=yes
   with_items:
     - devscripts
     - debhelper
@@ -32,4 +32,4 @@
 
 - name: Copy built Grape packages onto nodes
   shell: "scp /tmp/grape*deb {{ item }}:"
-  with_items: groups.elliptics
+  with_items: groups.servers
