@@ -27,7 +27,6 @@ def pytest_unconfigure(config):
 class TestRunner(object):
     def __init__(self, config):
         self.test_name = None
-        self.delete_nodes = True
 
         self.repo_dir = config.option.repo_dir
         self.pkgs_dir = config.option.pkgs_dir
@@ -39,8 +38,13 @@ class TestRunner(object):
                           'elliptics_start': "elliptics-start",
                           'elliptics_stop': "elliptics-stop"}
 
-        self.instances_names = {'client': "elliptics-testing-client",
-                                'server': "elliptics-testing-server"}
+        if self.testsuite_params.get("_branch"):
+            branch = self.testsuite_params["_branch"]
+        else:
+            branch = "testing"
+
+        self.instances_names = {'client': "elliptics-{0}-client".format(branch),
+                                'server': "elliptics-{0}-server".format(branch)}
 
         self.prepare_base_environment(config.option)
 
@@ -50,11 +54,6 @@ class TestRunner(object):
         ansible_manager.run_playbook(playbook, inventory)
         
     # pytest hooks
-    def pytest_unconfigure(self, config):
-        if self.delete_nodes:
-            print("don't delete instances - rebuild them plz")
-#            instances_manager.delete(self.instances_cfg)
-
     def pytest_runtest_setup(self, item):
         self.test_name = re.split("[\[\]]", item.name)[1]
 
@@ -116,7 +115,6 @@ class TestRunner(object):
                                                             test_env["clients"]["count"])
             self.instances_params["servers"]["count"] = max(self.instances_params["servers"]["count"],
                                                             sum(test_env["servers"]["count_per_group"]))
-            self.delete_nodes &= test_env["delete_nodes"]
 
     def install_elliptics_packages(self):
         """ Installs elliptics packages on all servers and clients

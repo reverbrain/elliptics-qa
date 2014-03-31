@@ -74,10 +74,6 @@ apt_preserve_sources_list: true
                 print('\nA record for {0} was deleted'.format(i))
         time.sleep(30)
 
-        #TODO: delete instance count checking
-        print('Checking before create request...')
-        self.check_instances_limit()
-
         for instance_cfg in config['servers']:
             self.create_instance(data=instance_cfg)
 
@@ -85,17 +81,8 @@ apt_preserve_sources_list: true
         for instance_cfg in config['servers']:
             instances += utils.get_instances_names_from_conf(instance_cfg)
 
-        print('Checking after create request...')
-        self.check_instances_limit()
-        
         if not utils.check_availability(session=self, instances=instances):
-            print('Checking after availability check...')
-            self.check_instances_limit()
-
             raise RuntimeError("Not all nodes available")
-
-        print('Checking after availability check...')
-        self.check_instances_limit()
 
     def delete_instances(self, config): 
         for instance_cfg in config['servers']:
@@ -104,9 +91,6 @@ apt_preserve_sources_list: true
             for i in instances:
                 self.delete_instance(i)
 
-        print('Checking after delete request...')
-        self.check_instances_limit()
-       
     def rebuild_instances(self, config):
         instances = []
         for instance_cfg in config['servers']:
@@ -258,19 +242,3 @@ apt_preserve_sources_list: true
         url = utils.get_url("SERVERS", tenant_id=self.tenant_id)
         instances = self.get(url)['servers']
         return instances
-
-    def check_instances_limit(self):
-        limits = self.get('{host}:{port}/{uri}'.format(
-                host=utils.os_url,
-                port=utils.ENDPOINTS_INFO['COMPUTE']['port'],
-                uri='v2/{tenant_id}/limits'.format(tenant_id=self.tenant_id)))
-        total_instances_used = int(limits['limits']['absolute']['totalInstancesUsed'])
-
-        instances_count = len(self.get_instances())
-
-        if instances_count != total_instances_used:
-            print('Total instances used: {0}'.format(total_instances_used))
-            print('Instances count: {0}'.format(instances_count))
-            print('Diff: {0}'.format(total_instances_used - instances_count))
-
-        return total_instances_used - instances_count
