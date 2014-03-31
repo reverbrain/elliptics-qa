@@ -61,8 +61,7 @@ def with_same_sha1_as(data):
     return WithSameSha1As(data)
 
 def elliptics_result_with(error_code, timestamp, user_flags, data):
-    """ Matcher which checking elliptics async_result that
-    Матчер для проверки асинхронного результат elliptics'а на то, что
+    """ Matcher which checking that elliptics async_result meets the following conditions:
     async_result.error.code == zero
     async_result.timestamp >= timestamp before this operation
     async_result.user_flags has proper value
