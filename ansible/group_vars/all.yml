@@ -1,0 +1,22 @@
+--- # This file contains default parameters
+# Packages versions
+elliptics_version: newest
+eblob_version: newest
+
+# Elliptics servers parameters
+log_dir: /var/log/elliptics
+data_dir: /opt/elliptics
+hist_dir: /tmp/history
+config: /etc/elliptics.conf
+
+# Test paramaters
+check_timeout: 30
+wait_timeout: 25
+
+# Cocaine parameters
+cocaine_runtime_dir: /var/run/cocaine
+cocaine_spool_dir: /var/spool/cocaine
+grape_src: /tmp/grape
+
+remote_packages_dir: /root/pkgs
+remote_repo_dir: /root/elliptics-qa

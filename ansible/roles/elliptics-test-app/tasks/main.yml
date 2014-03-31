@@ -1,0 +1,34 @@
+---
+- name: Build test application
+  script: test_app.sh build {{ grape_src }}
+
+- name: Prepare profile file for test application
+  copy: src=test_app.profile dest=/tmp
+
+- name: Prepare manifest file for test application
+  template: src=test_app.conf.j2 dest=/tmp/{{ item }}.conf
+  with_items: test_apps
+
+- name: Pack and deploy test application
+  script: test_app.sh deploy {{ grape_src }} {{ item[0] }} {{ item[1] }}
+  with_nested: test_apps, groups.servers
+
+- name: Start test application
+  script: test_app.sh start {{ item }} {{ groups.servers[0] }} 1
+  with_items: test_apps
+
+- name: Ping test application
+  script: test_app.sh ping {{ item }} {{ groups.servers[0] }} 1
+  with_items: test_apps
+
+- name: Stop test application
+  script: test_app.sh stop {{ item }} {{ groups.servers[0] }} 1
+  with_items: test_apps
+
+- name: Start test application (iteration 2)
+  script: test_app.sh start {{ item }} {{ groups.servers[0] }} 1
+  with_items: test_apps
+
+- name: Ping test application (iteration 2)
+  script: test_app.sh ping {{ item }} {{ groups.servers[0] }} 1
+  with_items: test_apps

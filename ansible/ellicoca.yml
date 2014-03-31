@@ -1,0 +1,13 @@
+---
+- hosts: servers
+  roles:
+    - prepare-cocaine
+
+- hosts: clients
+  roles:
+    - build-grape
+
+- hosts: servers
+  tasks:
+    - name: Install Grape libs
+      shell: dpkg -i grape*deb
